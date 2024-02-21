@@ -1,0 +1,264 @@
+---
+title: "Working with Big Data in Political Science"
+subtitle: "An introduction to using Google's BigQuery with R"
+format: 
+  revealjs:
+    slide-number: true
+    preview-links: auto
+    theme: solarized
+    embed-resources: true
+execute: 
+  message: false
+  warning: false
+  echo: true
+---
+
+```{r}
+#| echo: false
+
+bigrquery::bq_auth("harriet.goers@gmail.com")
+```
+
+## What problem are we solving?
+
+-   Truly big data
+
+    -   Need to work outside of your computer's memory
+
+-   Need a tool that helps you store, manage, and work with these data
+
+-   Don't want to learn a whole new language
+
+## BigQuery
+
+*What is Google's BigQuery?*
+
+-   Serverless data warehouse
+
+-   Built-in query engine
+
+## `bigrquery`
+
+*R package that allows you to work with data stored in BigQuery through R.*
+
+<br>
+
+To install:
+
+```{r}
+#| eval: false
+
+install.packages(c("bigrquery", "DBI", "dplyr"))
+```
+
+To load into your current session:
+
+```{r}
+library(bigrquery)
+library(DBI)
+library(dplyr)
+```
+
+## How to store your data
+
+BigQuery is hierarchical:
+
+-   **Tables** are stored in:
+
+    -   **Datasets**, which are stored in:
+
+        -   **Projects**.
+
+## How to store your data
+
+![](img/data_structure.png){fig-align="center"}
+
+## Tables
+
+![](img/schema.png){fig-align="center"}
+
+## Tables
+
+![](img/details.png){fig-align="center"}
+
+## Tables
+
+![](img/preview.png){fig-align="center"}
+
+## Uploading your data
+
+*We will step through uploading your data to BigQuery*
+
+## Uploading data manually
+
+![](img/Screen%20Shot%202024-02-14%20at%2012.30.26%20PM.png){fig-align="center"}
+
+## Uploading data manually
+
+![](img/Screen%20Shot%202024-02-14%20at%2012.30.45%20PM.png){fig-align="center"}
+
+## Uploading data manually
+
+![](img/Screen%20Shot%202024-02-14%20at%2012.32.30%20PM.png){fig-align="center"}
+
+## Uploading data manually
+
+![](img/Screen%20Shot%202024-02-14%20at%2012.34.32%20PM.png)
+
+## Uploading data manually
+
+![](img/Screen%20Shot%202024-02-14%20at%2012.34.47%20PM.png){fig-align="center"}
+
+## Uploading data using `bigrquery`
+
+```{r}
+
+library(bigrquery)
+library(DBI)
+library(dplyr)
+```
+
+List useful information:
+
+```{r}
+
+selected_project <- "trade-dependence"
+selected_dataset <- "bilatal_trade_hs6"
+```
+
+## Uploading data using `bigrquery`
+
+First, check that the table does not already exist:
+
+```{r}
+bq_gdp_current <- bq_table(project = selected_project, 
+                           dataset = selected_dataset, 
+                           table = "gdp_current")
+
+bq_table_exists(bq_gdp_current)
+```
+
+::: aside
+The first time you do this, you will need to authorize `bigrquery`'s access to your Google account. To do this, follow the instructions printed in your consol.
+:::
+
+## Uploading data using `bigrquery`
+
+Next, create the (empty) table:
+
+```{r}
+#| eval: false
+
+bq_table_create(
+  bq_gdp_current,
+  fields = gdp_current,
+  friendly_name = "GDP (current USD)",
+  description = "The data was extracted from the World Bank."
+)
+
+bq_table_exists(bq_gdp_current)
+```
+
+```{r}
+#| echo: false
+
+print(T)
+```
+
+## Uploading data using `bigrquery`
+
+Next, upload your data to that empty table:
+
+```{r}
+#| eval: false
+
+bq_table_upload(bq_gdp_current, gdp_df)
+```
+
+## Working with your data
+
+*We will now step through how to work with big data out of your computer's memory*
+
+## Starting in R with `dplyr`
+
+*Let's collect data on Australia's GDP.*
+
+## Starting in R with `dplyr`
+
+These data are stored in the `trade-dependence` project and the `country_annual_information` dataset.
+
+```{r}
+selected_project <- "trade-dependence"
+selected_dataset <- "country_annual_information" 
+
+con <- dbConnect(
+  bigrquery::bigquery(),
+  project = selected_project,
+  dataset = selected_dataset,
+  billing = selected_project
+)
+
+con
+```
+
+## Starting in R with `dplyr`
+
+Create the connection to the `reporter_gdp` table:
+
+```{r}
+gdp_df <- tbl(con, "reporter_gdp")
+gdp_df
+```
+
+## Starting in R with `dplyr`
+
+Query that table:
+
+```{r}
+#| eval: false
+
+aus_gdp <- gdp_df |> 
+  filter(reporter_code == 36) |> 
+  collect()
+
+aus_gdp
+```
+
+```{r}
+#| echo: false
+
+aus_gdp <- readr::read_csv(here::here("data", "aus_gdp.csv"))
+aus_gdp
+```
+
+## Moving between R and BigQuery
+
+R will write your SQL queries for you:
+
+```{r}
+gdp_df |> 
+  filter(reporter_code == 36) |> 
+  show_query()
+```
+
+## Moving between R and BigQuery
+
+You can perform that query in BigQuery's in-built query engine:
+
+![](img/Screen%20Shot%202024-02-14%20at%202.03.42%20PM.png){fig-align="center"}
+
+## Moving between R and BigQuery
+
+You can perform that query in BigQuery's in-built query engine:
+
+![](img/Screen%20Shot%202024-02-14%20at%202.04.29%20PM.png){fig-align="center"}
+
+## Performing complex queries
+
+![](img/Screen%20Shot%202024-02-14%20at%202.07.04%20PM.png){fig-align="center"}
+
+## Next steps
+
+-   Partitioning and clustering your datasets
+    -   Great for yearly, country-level data
+-   Integrated ML model-building
